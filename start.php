@@ -6,6 +6,5 @@
  */
 
 require 'core/Things.php';
-
 $things = new Things();
 $things->start();
