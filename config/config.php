@@ -5,6 +5,7 @@
  * Date: 16/12/5 下午7:25
  */
 $config['domain'] = 'www.zngirls.com';
+$config['start_url'] = 'g/21231';
 $config['try_index'] = 'index,index.php,index.html';
 
 $config['content_regex'] = array(

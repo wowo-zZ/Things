@@ -46,14 +46,14 @@ class Things {
     }
 
     public function start() {
-        $this->got_url[] = 'http://' . $this->config['domain'];
+        $this->got_url[] = 'http://' . $this->config['domain'] . '/' . $this->config['start_url'];
         while ($visit_url = array_shift($this->got_url)) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_URL, $visit_url);
             $output = curl_exec($ch);
             $this->visiting_url = $visit_url;
-            $this->process_url($output);
+            $this->process_url_zngirls($output);
             $this->process_data($output);
             $this->visited_url[] = $visit_url;
             if (count($this->visited_url) > 500) {
@@ -70,6 +70,45 @@ class Things {
         preg_match_all('/<a.*?\shref=["\']+(.*?)["\']+/', $output, $result);
         #过滤掉已记录过的url
         foreach (array_unique($result[1]) as $url) {
+            if ('#' == $url) {
+                continue;
+            }
+            if (strpos($url, 'http://') === FALSE) {
+                $url = 'http://' . $this->config['domain'] . '/' . ltrim($url, '/');
+            } else {
+                $url_data = parse_url($url);
+                if ($url_data['host'] !== $this->config['domain']) {
+                    continue;
+                }
+            }
+            if (!in_array($url, $this->visited_url) && !in_array($url, $this->got_url)) {
+                $this->got_url[] = $url;
+            }
+        }
+    }
+
+    private function process_url_zngirls($output) {
+        preg_match_all('/<a.*?\shref=["\']+(\/g\/\d{1,7}\/\d{1,3}\.html)["\']/', $output, $same_topic);
+        preg_match_all('/<a.*?\shref=["\']+(\/g\/\d{1,7}\/)["\']/', $output, $other_topic);
+        #过滤掉已记录过的url
+        foreach (array_unique($same_topic[1]) as $url) {
+            if ('#' == $url) {
+                continue;
+            }
+            if (strpos($url, 'http://') === FALSE) {
+                $url = 'http://' . $this->config['domain'] . '/' . ltrim($url, '/');
+            } else {
+                $url_data = parse_url($url);
+                if ($url_data['host'] !== $this->config['domain']) {
+                    continue;
+                }
+            }
+            if (!in_array($url, $this->visited_url) && !in_array($url, $this->got_url)) {
+                $this->got_url[] = $url;
+            }
+        }
+
+        foreach (array_unique($other_topic[1]) as $url) {
             if ('#' == $url) {
                 continue;
             }
