@@ -1,15 +1,13 @@
 <?php
 
 /**
- *
- * User: gui.zheng@husor.com
+ * Main class of Things
+ * User: wowo
  * Date: 16/12/5 下午7:11
  */
 class Things {
 
     protected $config;
-
-    protected $persistent;
 
     protected $got_url = array();
 
@@ -56,7 +54,7 @@ class Things {
             $this->process_url_zngirls($output);
             $this->process_data($output);
             $this->visited_url[] = $visit_url;
-            if (count($this->visited_url) > 500) {
+            if (count($this->visited_url) > $this->config['max_url_num']) {
                 break;
             }
         }
@@ -82,7 +80,7 @@ class Things {
                 }
             }
             if (!in_array($url, $this->visited_url) && !in_array($url, $this->got_url)) {
-                $this->got_url[] = $url;
+                $this->add_url($this->got_url, $url);
             }
         }
     }
@@ -91,8 +89,10 @@ class Things {
         preg_match_all('/<a.*?\shref=["\']+(\/g\/\d{1,7}\/\d{1,3}\.html)["\']/', $output, $same_topic);
         preg_match_all('/<a.*?\shref=["\']+(\/g\/\d{1,7}\/)["\']/', $output, $other_topic);
         #过滤掉已记录过的url
-        foreach (array_unique($same_topic[1]) as $url) {
-            if ('#' == $url) {
+        $same_topic = array_reverse(array_unique($same_topic[1]));
+        foreach (array_unique($same_topic) as $url) {
+            #起始url就是第一页,为了避免重复下载第一页,需要将1.html过滤掉
+            if ('#' == $url || strpos($url, '/1.html') > 0) {
                 continue;
             }
             if (strpos($url, 'http://') === FALSE) {
@@ -104,7 +104,7 @@ class Things {
                 }
             }
             if (!in_array($url, $this->visited_url) && !in_array($url, $this->got_url)) {
-                $this->got_url[] = $url;
+                array_unshift($this->got_url, $url);
             }
         }
 
@@ -126,6 +126,18 @@ class Things {
         }
     }
 
+    #根据配置的遍历方式,将url添加到got_url中
+    private function add_url($urls, $url) {
+        switch ($this->config['traverse_method']) {
+            case 'wide':
+                array_push($urls, $url);
+                break;
+            case 'deep':
+                array_unshift($urls, $url);
+                break;
+        }
+    }
+
     private function process_data($output) {
         $img_regex = '/<img.*?\ssrc=["\']+(.*?)["\']+/';
         preg_match_all($img_regex, $output, $result);
@@ -140,7 +152,7 @@ class Things {
     private function download_data($url) {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
-        #这么简单的referer防盗链,我这个菜鸟都能15分钟破解。。
+        #添加referer,破解防盗链
         curl_setopt($ch, CURLOPT_REFERER, $this->visiting_url);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -149,13 +161,12 @@ class Things {
         $return_content = ob_get_contents();
         $file_size = ob_get_length();
         #太小的图片就不要了
-        if ($file_size < 50000) {
+        if ($this->config['pic_size'] && $file_size < $this->config['pic_size']) {
             return;
         }
         ob_end_clean();
-
         curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $filename = $this->download_dir . uniqid() . '.jpg';
+        $filename = $this->config['download_dir'] . microtime(TRUE) * 10000 . '.jpg';
         $fp = @fopen($filename, "a");
         fwrite($fp, $return_content);
     }
